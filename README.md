@@ -1,1 +1,1 @@
-# gnn-learn
+# GDGNN

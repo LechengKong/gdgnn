@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# Customized
+saved_exp/
+gdbackup/
+data/ogb*
+molecules/
+recent_commands
+*.pth
+engr_job
+molecules.zip
+test_bed.py

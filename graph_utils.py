@@ -1,4 +1,5 @@
 import numpy as np
+from gnnfree.utils.graph import get_k_hop_neighbors
 
 from gnnfree.utils.utils import *
 
@@ -187,3 +188,86 @@ def get_pair_wise_vert_gd(g, adj, head, tail, max_dist):
 
         ret = np.array([dist]), head_gd, tail_gd, head_gd_len, tail_gd_len, head_gd_deg, tail_gd_deg
     return ret
+
+
+
+def get_hor_gd_hop_map(adj_mat, dist, head, tail, remove_edge=False):
+    head_k_hop = get_k_hop_neighbors(adj_mat, head, int(dist/2)+int(dist%2), tail if remove_edge else None)
+    tail_k_hop = get_k_hop_neighbors(adj_mat, tail, int(dist/2), head if remove_edge else None)
+    no_connect_flag = True
+    for i in range(1, dist+1):
+        head_hop = int(i/2)+int(i%2)
+        tail_hop = int(i/2)
+        if head_hop in head_k_hop and tail_hop in tail_k_hop:
+            hop_intersect = np.intersect1d(head_k_hop[head_hop], tail_k_hop[tail_hop])
+            if len(hop_intersect)>0:
+                no_connect_flag = False
+                break
+        else:
+            break
+    if no_connect_flag:
+        return np.array([]), np.array([-1])
+
+    mid_node = np.random.choice(hop_intersect)
+
+    head_trace = backtrace_hop_mat(adj_mat, head_hop, head_k_hop, mid_node)
+
+    tail_trace = backtrace_hop_mat(adj_mat, tail_hop, tail_k_hop, mid_node)
+
+    return np.r_[np.flip(head_trace), mid_node, tail_trace], np.array([i])
+
+def backtrace_hop_mat(adj_mat, hop, hop_map, last_node):
+    trace_head = last_node
+    trace = []
+    for i in range(hop, 0, -1):
+        last_hop_ind = i-1
+        last_hop_nodes = hop_map[last_hop_ind]
+        nei = adj_mat[trace_head].nonzero()[1]
+        can = np.intersect1d(last_hop_nodes, nei)
+        trace_head = np.random.choice(can)
+        trace.append(trace_head)
+
+    return trace
+
+def get_ver_gd_hop_map(adj_mat, dist, head, tail, remove_edge=False):
+    t = SmartTimer(False)
+    t.record()
+    head_k_hop = get_k_hop_neighbors(adj_mat, head, int(dist/2)+int(dist%2), tail if remove_edge else None)
+    t.cal_and_update('headk')
+    tail_k_hop = get_k_hop_neighbors(adj_mat, tail, int(dist/2), head if remove_edge else None)
+    t.cal_and_update('tailk')
+    no_connect_flag = True
+    for i in range(1, dist+1):
+        head_hop = int(i/2)+int(i%2)
+        tail_hop = int(i/2)
+        if head_hop in head_k_hop and tail_hop in tail_k_hop:
+            hop_intersect = np.intersect1d(head_k_hop[head_hop], tail_k_hop[tail_hop])
+            if len(hop_intersect)>0:
+                no_connect_flag = False
+                break
+        else:
+            break
+    t.cal_and_update('inter')
+    if no_connect_flag:
+        return np.array([]), np.array([]), np.array([-1])
+    
+    if i==1:
+        return np.array([]), np.array([]), np.array([1])
+
+    head_trace = backtrace_hop_mat_all_nodes(adj_mat, head_hop, head_k_hop, hop_intersect)
+
+    tail_trace = backtrace_hop_mat_all_nodes(adj_mat, tail_hop, tail_k_hop, hop_intersect)
+    t.cal_and_update('gd')
+
+    return head_trace, tail_trace, np.array([i])
+
+def backtrace_hop_mat_all_nodes(adj_mat, hop, hop_map, last_inter):
+    trace_head = last_inter
+    for i in range(hop, 1, -1):
+        last_hop_ind = i-1
+        last_hop_nodes = hop_map[last_hop_ind]
+        nei = adj_mat[trace_head].nonzero()[1]
+        can = np.intersect1d(last_hop_nodes, nei)
+        trace_head = can
+
+    return trace_head

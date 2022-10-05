@@ -3,7 +3,7 @@ import torch
 import argparse
 import os.path as osp
 from datetime import datetime
-from datasets import HGHorGDDataset, HGHorSampleGDDataset, HGVerGDDataset, HGVerGDGraphDataset, HGVerGDSampleDataset, SimpleSampleClass
+from datasets import HGHorGDDataset, HGHorGDInterDataset, HGHorSampleGDDataset, HGVerGDDataset, HGVerGDGraphDataset, HGVerGDInterDataset, HGVerGDSampleDataset, SimpleSampleClass
 
 from gnnfree.managers.manager import Manager
 from gnnfree.managers.learner import *
@@ -88,11 +88,13 @@ def main(params):
         g.ndata['feat'] = dgl_data.graph[0].ndata['feat'].to(torch.float)
         params.inp_dim = g.ndata['feat'].size()[1]
         hn = 100
-        train_sample_size = 1000
+        train_sample_size = 10000000
         if params.gd_type == 'HorGD':
-            TrainSet = HGHorSampleGDDataset
+            # TrainSet = HGHorSampleGDDataset
+            TrainSet = HGHorGDInterDataset
         elif params.gd_type == 'VerGD':
-            TrainSet = HGVerGDSampleDataset
+            # TrainSet = HGVerGDSampleDataset
+            TrainSet = HGVerGDInterDataset
         elif params.gd_type == '':
             TrainSet = None
     else:
@@ -101,9 +103,11 @@ def main(params):
         hn = 50
         train_sample_size = None
         if params.gd_type == 'HorGD':
-            TrainSet = HGHorSampleGDDataset
+            # TrainSet = HGHorSampleGDDataset
+            TrainSet = HGHorGDInterDataset
         elif params.gd_type == 'VerGD':
-            TrainSet = HGVerGDDataset
+            # TrainSet = HGVerGDSampleDataset
+            TrainSet = HGVerGDInterDataset
         elif params.gd_type == '':
             TrainSet = None
 
@@ -175,7 +179,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--emb_dim", type=int, default=32)
     parser.add_argument("--mol_emb_dim", type=int, default=32)
-    parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--JK", type=str, default='last')
     parser.add_argument("--hidden_dim", type=int, default=32)
 
@@ -183,13 +187,13 @@ if __name__ == '__main__':
 
     parser.add_argument("--lr",type=float,default=0.0001)
     parser.add_argument("--l2",type=float,default=0)
-    parser.add_argument("--batch_size",type=int, default=256)
-    parser.add_argument("--eval_batch_size", type=int, default=256)
+    parser.add_argument("--batch_size",type=int, default=4096)
+    parser.add_argument("--eval_batch_size", type=int, default=512)
 
-    parser.add_argument("--num_workers",type=int, default=20)
+    parser.add_argument("--num_workers",type=int, default=32)
     parser.add_argument("--save_every",type=int, default=1)
 
-    parser.add_argument("--num_epochs", type=int, default=100)
+    parser.add_argument("--num_epochs", type=int, default=5)
 
     parser.add_argument("--reach_dist", type=int, default=3)
 

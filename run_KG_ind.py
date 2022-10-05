@@ -79,14 +79,14 @@ def main(params):
     params.inp_dim = 1
 
     evlter = VarSizeRankingEvaluator('varsizeeval', params.num_workers)
-    eval_metric = 'mrr'
+    eval_metric = 'h10'
 
     def prepare_eval_data(res, data):
         return [res, data.bsize]
     
     # loss = NegLogLoss(params.neg_sample)
-    # loss = FirstPosNegLoss(params.neg_sample)
-    loss = MRRLoss(params.neg_sample)
+    loss = FirstPosNegLoss(params.neg_sample)
+    # loss = MRRLoss(params.neg_sample)
 
     train = TrainSet(trans_graph, trans_triplets['train'], params, trans_adj_list, mode='train', neg_link_per_sample=params.neg_sample)
     
@@ -108,7 +108,7 @@ def main(params):
         train, test, val = data
         args.reach_dist = args.num_layers
         gnn = RGCN(args.num_layers, args.aug_num_rels, args.inp_dim, args.emb_dim, drop_ratio=args.dropout)
-        model = RelLinkPredictor(args.emb_dim, args.num_rels, gnn, [args.gd_type])
+        model = RelLinkPredictor(args.emb_dim, args.num_rels, gnn, [args.gd_type, 'dist'])
         model = model.to(args.device)
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
@@ -131,6 +131,7 @@ def main(params):
         return val_res, test_res
 
     hparams={'num_layers':[2,3,4,5]} if params.psearch else {'num_layers':[params.num_layers]}
+    # hparams={'dropout':[0, 0.3,0.5,0.7,0.9],'l2':[0.001,0.0001,0.00001]}
 
     best_res = hyperparameter_grid_search(hparams, [train, test, val], run_exp, params, eval_metric, evlter)
     
@@ -141,34 +142,34 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='gnn')
 
     parser.add_argument("--data_path", type=str, default="./data")
-    parser.add_argument("--train_data_set", type=str, default="WN18RR_v1")
-    parser.add_argument("--val_method", type=str, default="trans")
+    parser.add_argument("--train_data_set", type=str, default="fb237_v1")
+    parser.add_argument("--val_method", type=str, default="ind")
 
     parser.add_argument("--emb_dim", type=int, default=32)
     parser.add_argument("--mol_emb_dim", type=int, default=32)
-    parser.add_argument("--num_layers", type=int, default=3)
+    parser.add_argument("--num_layers", type=int, default=4)
     parser.add_argument("--JK", type=str, default='sum')
     parser.add_argument("--hidden_dim", type=int, default=32)
 
-    parser.add_argument("--dropout",type=float,default=0.2)
+    parser.add_argument("--dropout",type=float,default=0.3)
 
     parser.add_argument("--lr",type=float,default=0.01)
-    parser.add_argument("--l2",type=float,default=0.001)
+    parser.add_argument("--l2",type=float,default=0.0001)
     parser.add_argument("--batch_size",type=int, default=64)
     parser.add_argument("--eval_batch_size", type=int, default=64)
     parser.add_argument("--neg_sample", type=int, default=50)
 
-    parser.add_argument("--num_workers",type=int, default=20)
+    parser.add_argument("--num_workers",type=int, default=32)
     parser.add_argument("--save_every",type=int, default=1)
 
-    parser.add_argument("--num_epochs", type=int, default=10)
+    parser.add_argument("--num_epochs", type=int, default=70)
 
     parser.add_argument("--reach_dist", type=int, default=3)
 
     parser.add_argument("--gpuid", type=int, default=0)
     parser.add_argument("--fold", type=int, default=10)
 
-    parser.add_argument("--gd_type", type=str, default='HorGD')
+    parser.add_argument("--gd_type", type=str, default='VerGD')
 
     parser.add_argument('--gdgnn', type=bool, default=False)
     parser.add_argument('--gd_deg', type=bool, default=False)

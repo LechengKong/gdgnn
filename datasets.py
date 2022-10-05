@@ -80,15 +80,18 @@ class KGVerGDNegSampleDataset(KGNegSampleDataset):
         self.timer.record()
         head, rel, tail = self.edges[index]
         neg_tail, neg_head = self.sample_links(head, rel, tail)
+        self.timer.cal_and_update('sample')
 
         _,_,edges = self.graph.edge_ids(head,tail, return_uv=True)
 
         if self.mode=='train' and len(edges)==1:
             remove_gt_graph_edge(self.gt_g, head, tail)
         adj = adjacency(self.gt_g)
+        self.timer.cal_and_update('update')
 
         head_gd = get_single_source_ver_gd(self.gt_g, adj, head, neg_tail, self.params.reach_dist)
         tail_gd = get_single_source_ver_gd(self.gt_g, adj, tail, neg_head, self.params.reach_dist)
+        self.timer.cal_and_update('vergd')
 
         head_close_gd_arr = np.concatenate([head_gd[2], tail_gd[0]])
         tail_close_gd_arr = np.concatenate([head_gd[0], tail_gd[2]])
@@ -100,6 +103,7 @@ class KGVerGDNegSampleDataset(KGNegSampleDataset):
         head_arr = np.concatenate([np.array([head]).repeat(len(neg_tail)), neg_head])
         tail_arr = np.concatenate([neg_tail, np.array([tail]).repeat(len(neg_head))])
         rel_arr = np.array([rel]).repeat(len(head_arr))
+        self.timer.cal_and_update('prepare')
         
         self.timer.cal_and_update('gd')
         if self.mode=='train' and len(edges)==1:
@@ -264,6 +268,54 @@ class HGHorGDDataset(SingleGraphDataset):
     def get_collate_fn(self):
         return collate_hor_link
 
+class HGHorGDInterDataset(SingleGraphDataset):
+    def __init__(self, graph, edges, labels, num_entities, params, mode='train'):
+        super().__init__(graph)
+        self.mode = mode
+        self.params = params
+        self.edges = edges
+        self.labels = labels
+        self.num_edges = len(edges)
+        self.pos_edge_count = int(self.num_edges/2)
+        self.timer = SmartTimer(False)
+        self.__getitem__(0)
+
+    def __len__(self):
+        return self.num_edges
+
+    def __getitem__(self, index):
+        self.timer.record()
+        edge = self.edges[index]
+        head, rel, tail = edge
+        label = self.labels[index]
+        self.timer.record()
+        if self.mode=='train' and label==1:
+            remove_edge = True
+            masked_edge = [index, index+self.pos_edge_count]
+        else:
+            remove_edge = False
+            masked_edge = []
+        self.timer.cal_and_update('pre')
+        rand_path, dist = get_hor_gd_hop_map(self.adj_mat, self.params.reach_dist, head, tail, remove_edge)
+        self.timer.cal_and_update('sp')
+        # all_pred = all_predecessors(self.gt_g, head_dist, head_pred)
+        # rand_path = random_shortest_path(self.gt_g, head, tail, head_dist, head_pred,all_pred)
+        # rand_path = random_shortest_path(self.gt_g, head, tail)
+        self.timer.cal_and_update('random_p')
+        
+        gd_length = np.array([len(rand_path)])
+        dist[dist<0] = self.params.reach_dist+2
+
+        gd = rand_path
+        self.timer.cal_and_update('gdgg')
+        
+        ret = np.array([head]), np.array([tail]), dist, gd, gd_length, np.array(masked_edge), np.array([label])
+        # print(ret)
+        return ret
+
+    def get_collate_fn(self):
+        return collate_hor_link
+
 class HGHorSampleGDDataset(SingleGraphDataset):
     def __init__(self, graph, edges, labels, num_entities, params, mode='train', sample_size=20000, max_nodes_per_hop=10000):
         super().__init__(graph)
@@ -368,6 +420,59 @@ class HGVerGDDataset(SingleGraphDataset):
     def get_collate_fn(self):
         return collate_ver_link
 
+class HGVerGDInterDataset(SingleGraphDataset):
+    def __init__(self, graph, edges, labels, num_entities, params, mode='train', hop_sampling=False):
+        super().__init__(graph)
+        self.mode = mode
+        self.params = params
+        self.edges = edges
+        self.labels = labels
+        self.num_edges = len(edges)
+        self.pos_edge_count = int(self.num_edges/2)
+        self.hop_sampling = hop_sampling
+        self.timer = SmartTimer(False)
+        self.__getitem__(0)
+
+    def __len__(self):
+        return self.num_edges
+
+    def __getitem__(self, index):
+        edge = self.edges[index]
+        head, rel, tail = edge
+        label = self.labels[index]
+
+        self.timer.record()
+        if self.mode=='train' and label==1:
+            remove_edge = True
+            masked_edge = [index, index+self.pos_edge_count]
+        else:
+            remove_edge = False
+            masked_edge = []
+        self.timer.cal_and_update('remove')
+
+        head_gd, tail_gd, dist = get_ver_gd_hop_map(self.adj_mat, self.params.reach_dist, head, tail, remove_edge)
+        self.timer.cal_and_update('gd')
+
+        dist[dist<0] = self.params.reach_dist+2
+
+        head_gd_len = np.array([len(head_gd)])
+        tail_gd_len = np.array([len(tail_gd)])
+        self.timer.cal_and_update('prepare')
+
+        # head_gd_deg = get_gd_deg(self.adj_mat, head_gd)
+        # tail_gd_deg = get_gd_deg(self.adj_mat, tail_gd)
+        head_gd_deg = get_gd_deg_dgl(self.graph, head_gd)
+        tail_gd_deg = get_gd_deg_dgl(self.graph, tail_gd)
+        self.timer.cal_and_update('adddeg')
+        # print(link_arr)
+        # print(dist_arr)
+        # print(geodesics)
+        ret = np.array([head]), np.array([tail]), dist, head_gd.astype(int), tail_gd.astype(int), head_gd_len, tail_gd_len, head_gd_deg, tail_gd_deg, np.array(masked_edge), np.array([label])
+        # print(ret)
+        return ret
+    def get_collate_fn(self):
+        return collate_ver_link
+
 class HGVerGDSampleDataset(SingleGraphDataset):
     def __init__(self, graph, edges, labels, num_entities, params, mode='train', sample_size=20000, max_nodes_per_hop=10000):
         super().__init__(graph)
@@ -446,7 +551,7 @@ class HGVerGDGraphDataset(DatasetWithCollate):
         center_nodes, reached_nodes = (distance_mat<=self.params.reach_dist).nonzero()
         self.timer.cal_and_update('reachable nodes')
         if len(reached_nodes)==0:
-            ret = graph, np.array([]), np.array([0]), np.array([]), np.array([]), np.array([0]), np.array([]), np.array([self.labels[index].numpy()])
+            ret = graph, np.array([]), np.array([0]*num_nodes), np.array([]), np.array([]), np.array([]), np.array([]), np.array([self.labels[index]])
             self.timer.cal_and_update('fulltime')
             return ret
         # Recover self distance

@@ -135,12 +135,12 @@ if __name__ == '__main__':
     parser.add_argument("--JK", type=str, default='last')
     parser.add_argument("--hidden_dim", type=int, default=32)
 
-    parser.add_argument("--dropout",type=float,default=0)
+    parser.add_argument("--dropout",type=float,default=0.5)
 
-    parser.add_argument("--lr",type=float,default=0.0001)
+    parser.add_argument("--lr",type=float,default=0.001)
     parser.add_argument("--l2",type=float,default=0)
-    parser.add_argument("--batch_size",type=int, default=64)
-    parser.add_argument("--eval_batch_size", type=int, default=64)
+    parser.add_argument("--batch_size",type=int, default=256)
+    parser.add_argument("--eval_batch_size", type=int, default=256)
 
     parser.add_argument("--num_workers",type=int, default=20)
     parser.add_argument("--save_every",type=int, default=1)
@@ -152,8 +152,8 @@ if __name__ == '__main__':
     parser.add_argument("--gpuid", type=int, default=0)
     parser.add_argument("--fold", type=int, default=10)
 
-    parser.add_argument('--gdgnn', type=bool, default=False)
-    parser.add_argument('--gd_deg', type=bool, default=False)
+    parser.add_argument('--gdgnn', type=bool, default=True)
+    parser.add_argument('--gd_deg', type=bool, default=True)
 
     parser.add_argument("--psearch", type=bool, default=True)
 

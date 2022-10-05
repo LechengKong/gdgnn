@@ -145,9 +145,20 @@ def get_vert_gd(graph, source_dist, node, dist):
     return gd, gd_len
 
 def get_gd_deg(adj, gd):
+    t = SmartTimer(True)
+    t.record()
     grid = np.meshgrid(gd,gd)
+    t.cal_and_update('grid')
     adj = np.asarray(adj[grid[0], grid[1]].todense())
+    t.cal_and_update('cal')
     return adj.sum(-1)
+
+def get_gd_deg_dgl(g, gd):
+    grid_row, grid_col = np.meshgrid(gd,gd)
+    t = g.has_edges_between(grid_row.reshape(-1), grid_col.reshape(-1))
+    t = t.view(len(grid_row),len(grid_row))
+    deg = t.sum(-1)
+    return deg.numpy()
 
 def get_pair_wise_vert_gd(g, adj, head, tail, max_dist):
     head_dist_map, head_pred_map = shortest_distance(g, head, max_dist=max_dist, pred_map=True)

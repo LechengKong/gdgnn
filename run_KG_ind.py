@@ -17,7 +17,7 @@ from gnnfree.nn.models.task_predictor import LinkPredictor
 from gnnfree.nn.models.GNN import RGCN
 
 from torch.optim import Adam
-from learners import LinkFixedSizeRankingLearner, LinkPredictionLearner, PrecomputeNELPLearner
+from learners import KGPrecomputeNELPLearner, LinkFixedSizeRankingLearner, LinkPredictionLearner, PrecomputeNELPLearner
 from models.link_predictor import GDLinkPredictor, RelLinkPredictor
 
 def main(params):
@@ -80,9 +80,6 @@ def main(params):
 
     evlter = VarSizeRankingEvaluator('varsizeeval', params.num_workers)
     eval_metric = 'h10'
-
-    def prepare_eval_data(res, data):
-        return [res, data.bsize]
     
     # loss = NegLogLoss(params.neg_sample)
     loss = FirstPosNegLoss(params.neg_sample)
@@ -113,11 +110,11 @@ def main(params):
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
 
-        train_learner = LinkFixedSizeRankingLearner('train', train, model, loss, optimizer, args.batch_size)
-        val_learner = PrecomputeNELPLearner('val', val, model, None, None, args.eval_batch_size)
-        test_learner = PrecomputeNELPLearner('test', test, model, None, None, args.eval_batch_size)
+        train_learner = LinkFixedSizeRankingLearner('train', train, model, args.batch_size)
+        val_learner = KGPrecomputeNELPLearner('val', val, model, args.eval_batch_size)
+        test_learner = KGPrecomputeNELPLearner('test', test, model, args.eval_batch_size)
 
-        trainer = Trainer(evlter, prepare_eval_data, args.num_workers)
+        trainer = Trainer(evlter, loss, args.num_workers)
 
         manager = Manager(args.model_name)
 

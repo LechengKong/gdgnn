@@ -72,9 +72,6 @@ def main(params):
 
     evlter = BinaryAccEvaluator('acc_eval')
     eval_metric = 'acc'
-
-    def prepare_eval_data(res, data):
-        return [res, data.labels]
     
     loss = MultiClassLoss()
 
@@ -108,11 +105,11 @@ def main(params):
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
 
-        train_learner = NodePredictionLearner('train', train, model, loss, optimizer, args.batch_size)
-        val_learner = PrecomputeNENCLearner('val', val, model, None, None, args.eval_batch_size)
-        test_learner = PrecomputeNENCLearner('test', test, model, None, None, args.eval_batch_size)
+        train_learner = NodePredictionLearner('train', train, model, args.batch_size)
+        val_learner = PrecomputeNENCLearner('val', val, model, args.eval_batch_size)
+        test_learner = PrecomputeNENCLearner('test', test, model, args.eval_batch_size)
 
-        trainer = Trainer(evlter, prepare_eval_data, args.num_workers)
+        trainer = Trainer(evlter, loss, args.num_workers)
 
         manager = Manager(args.model_name)
 

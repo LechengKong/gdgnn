@@ -16,7 +16,7 @@ from gnnfree.nn.models.task_predictor import LinkPredictor
 from gnnfree.nn.models.GNN import HomogeneousGNN
 
 from torch.optim import Adam
-from learners import LinkPredictionLearner, PrecomputeNELPLearner
+from learners import HGPrecomputeNELPLearner, LinkPredictionLearner, PrecomputeNELPLearner
 from models.link_predictor import GDLinkPredictor
 
 def main(params):
@@ -89,9 +89,6 @@ def main(params):
 
     evlter = BinaryHNEvaluator('acc_eval')
     eval_metric = 'auc'
-
-    def prepare_eval_data(res, data):
-        return [res, data.labels]
     
     loss = BinaryLoss()
 
@@ -123,11 +120,11 @@ def main(params):
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
 
-        train_learner = LinkPredictionLearner('train', train, model, loss, optimizer, args.batch_size)
-        val_learner = PrecomputeNELPLearner('val', val, model, None, None, args.eval_batch_size)
-        test_learner = PrecomputeNELPLearner('test', test, model, None, None, args.eval_batch_size)
+        train_learner = LinkPredictionLearner('train', train, model, args.batch_size)
+        val_learner = HGPrecomputeNELPLearner('val', val, model, args.eval_batch_size)
+        test_learner = HGPrecomputeNELPLearner('test', test, model, args.eval_batch_size)
 
-        trainer = Trainer(evlter, prepare_eval_data, args.num_workers)
+        trainer = Trainer(evlter, loss, args.num_workers)
 
         manager = Manager(args.model_name)
 

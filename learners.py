@@ -22,8 +22,8 @@ class LinkPredictionLearner(SingleModelLearner):
         res = self.model(subg, batch.head, batch.tail, batch)
         return res
 
-    def loss_fn(self, res, batch):
-        return self.loss(res, batch.labels)
+    def data_to_loss_arg(self, res, batch):
+        return res, batch.labels
 
 class PrecomputeNELPLearner(SingleModelLearner):
     def preprocess(self, device=None):
@@ -46,11 +46,22 @@ class PrecomputeNELPLearner(SingleModelLearner):
         self.processed_graph = None
         self.model.embedding_only_mode(False)
 
+class KGPrecomputeNELPLearner(PrecomputeNELPLearner):
+    def data_to_eval_arg(self, res, batch):
+        return res, batch.bsize
+
+class HGPrecomputeNELPLearner(PrecomputeNELPLearner):
+    def data_to_eval_arg(self, res, batch):
+        return res, batch.labels
+
 
 class LinkFixedSizeRankingLearner(LinkPredictionLearner):
 
-    def loss_fn(self, res, batch):
-        return self.loss(res)
+    def data_to_loss_arg(self, res, batch):
+        return [res]
+
+    def data_to_eval_arg(self, res, batch):
+        return res, batch.bsize
 
 
 class GraphPredictionLearner(SingleModelLearner):
@@ -64,8 +75,8 @@ class GraphPredictionLearner(SingleModelLearner):
         # print(res)
         return res
 
-    def loss_fn(self, res, batch):
-        return self.loss(res, batch.labels)
+    def data_to_loss_arg(self, res, batch):
+        return res, batch.labels
 
 
 class NodePredictionLearner(SingleModelLearner):
@@ -80,8 +91,8 @@ class NodePredictionLearner(SingleModelLearner):
         res = self.model(g, batch.node, batch)
         return res
 
-    def loss_fn(self, res, batch):
-        return self.loss(res, batch.labels)
+    def data_to_loss_arg(self, res, batch):
+        return res, batch.labels
 
 
 class PrecomputeNENCLearner(SingleModelLearner):
@@ -104,3 +115,6 @@ class PrecomputeNENCLearner(SingleModelLearner):
     def postprocess(self):
         self.processed_graph = None
         self.model.embedding_only_mode(False)
+
+    def data_to_eval_arg(self, res, batch):
+        return res, batch.labels

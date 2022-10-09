@@ -23,6 +23,7 @@ from gnnfree.nn.models.GNN import HomogeneousGNN
 from sklearn.model_selection import KFold, StratifiedKFold
 
 from torch.optim import Adam
+from torch.optim.lr_scheduler import ExponentialLR
 from learners import GraphPredictionLearner
 from models.graph_classifier import GDGraphClassifier
 
@@ -60,9 +61,6 @@ def main(params):
 
     evlter = BinaryAccEvaluator('acc_eval')
     eval_metric = 'acc'
-
-    def prepare_eval_data(res, data):
-        return [res, data.labels]
     
     c = 0
     for g, l in data:
@@ -78,9 +76,9 @@ def main(params):
     splits = k_fold2_split(folds, len(labels))
     data_col = []
 
-    def construct_hg_ver_data(data, ind):
+    def construct_hg_ver_data(data, labels, ind):
         graph = [data[i][0] for i in ind]
-        label = [data[i][1] for i in ind]
+        label = [labels[i] for i in ind]
         if not params.has_inp_feat:
             for g in graph:
                 g.ndata['feat'] = torch.ones((g.num_nodes(),1))
@@ -88,13 +86,14 @@ def main(params):
         return d
 
     for s in splits:
-        train = construct_hg_ver_data(data, s[0])
-        test = construct_hg_ver_data(data, s[1])
-        val = construct_hg_ver_data(data, s[2])
+        train = construct_hg_ver_data(data, labels, s[0])
+        test = construct_hg_ver_data(data, labels, s[1])
+        val = construct_hg_ver_data(data, labels, s[2])
         data_col.append([train,test,val])
 
     def run_exp(data, args):
         train, test, val = data
+        args.reach_dist = args.num_layers
         gnn = gnn_model(args.num_layers, args.inp_dim, args.emb_dim)
         if args.gdgnn:
             model = GDGraphClassifier(args.num_class, args.emb_dim, gnn, gd_deg=args.gd_deg)
@@ -103,17 +102,17 @@ def main(params):
         model = model.to(args.device)
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
+        scheduler = ExponentialLR(optimizer, gamma=0.9)
 
-        train_learner = GraphPredictionLearner('train', train, model, loss, optimizer, args.batch_size)
-        val_learner = GraphPredictionLearner('val', val, model, None, None, args.eval_batch_size)
-        test_learner = GraphPredictionLearner('test', test, model, None, None, args.eval_batch_size)
+        train_learner = GraphPredictionLearner('train', train, model, args.batch_size)
+        val_learner = GraphPredictionLearner('val', val, model, args.eval_batch_size)
+        test_learner = GraphPredictionLearner('test', test, model, args.eval_batch_size)
 
-        trainer = Trainer(evlter, prepare_eval_data, args.num_workers)
+        trainer = Trainer(evlter, loss, args.num_workers)
 
         manager = Manager(args.model_name)
 
-        manager.train(train_learner, val_learner, trainer, optimizer, eval_metric, device=args.device, num_epochs=args.num_epochs)
-
+        manager.train(train_learner, val_learner, trainer, optimizer, eval_metric, device=args.device, num_epochs=args.num_epochs, scheduler=scheduler)
         manager.load_model(train_learner)
 
         val_res = manager.eval(val_learner, trainer, device=args.device)
@@ -136,12 +135,12 @@ if __name__ == '__main__':
 
     parser.add_argument("--emb_dim", type=int, default=32)
     parser.add_argument("--num_layers", type=int, default=5)
-    parser.add_argument("--JK", type=str, default='last')
+    parser.add_argument("--JK", type=str, default='sum')
     parser.add_argument("--hidden_dim", type=int, default=32)
 
     parser.add_argument("--dropout",type=float,default=0)
 
-    parser.add_argument("--lr",type=float,default=0.0001)
+    parser.add_argument("--lr",type=float,default=0.001)
     parser.add_argument("--l2",type=float,default=0)
     parser.add_argument("--batch_size",type=int, default=8)
     parser.add_argument("--eval_batch_size", type=int, default=8)
@@ -149,17 +148,17 @@ if __name__ == '__main__':
     parser.add_argument("--num_workers",type=int, default=20)
     parser.add_argument("--save_every",type=int, default=1)
 
-    parser.add_argument("--num_epochs", type=int, default=100)
+    parser.add_argument("--num_epochs", type=int, default=50)
 
     parser.add_argument("--reach_dist", type=int, default=3)
 
     parser.add_argument("--gpuid", type=int, default=0)
     parser.add_argument("--fold", type=int, default=10)
 
-    parser.add_argument('--gdgnn', type=bool, default=False)
-    parser.add_argument('--gd_deg', type=bool, default=False)
+    parser.add_argument('--gdgnn', type=bool, default=True)
+    parser.add_argument('--gd_deg', type=bool, default=True)
 
-    parser.add_argument("--psearch", type=bool, default=True)
+    parser.add_argument("--psearch", type=bool, default=False)
 
 
 

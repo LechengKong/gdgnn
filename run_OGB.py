@@ -17,11 +17,13 @@ from gnnfree.nn.models.task_predictor import LinkPredictor
 from gnnfree.nn.models.GNN import HomogeneousGNN
 
 from torch.optim import Adam
-from learners import LinkPredictionLearner, PrecomputeNELPLearner
+from learners import HGPrecomputeNELPLearner, LinkPredictionLearner, PrecomputeNELPLearner
 from models.link_predictor import GDLinkPredictor
 
 from scipy.sparse import tril, coo_matrix
 from ogb.linkproppred import DglLinkPropPredDataset
+
+from dgl.nn.pytorch import GraphConv
 
 def main(params):
     params = parser.parse_args()
@@ -114,8 +116,6 @@ def main(params):
     evlter = HNEvaluator('acc_eval', hn=hn)
     eval_metric = 'h'+str(hn)
 
-    def prepare_eval_data(res, data):
-        return [res, data.labels]
     
     loss = BinaryLoss()
 
@@ -140,18 +140,23 @@ def main(params):
     
     def run_exp(data, args):
         train, test, val = data
-        args.reach_dist = args.num_layers
-        gnn = gnn_model(args.num_layers, args.inp_dim, args.emb_dim, drop_ratio=args.dropout)
-        model = GDLinkPredictor(args.emb_dim, gnn, [args.gd_type, 'dist'])
+        # args.reach_dist = args.num_layers
+        # gnn = gnn_model(args.num_layers, args.inp_dim, args.emb_dim, drop_ratio=args.dropout)
+        if args.gnn_type=='gcn':
+            gnn = gnn_model(args.num_layers, args.inp_dim, args.emb_dim, GraphConv, drop_ratio=args.dropout)
+            model = GDLinkPredictor(args.emb_dim, gnn, [], add_self_loop=True)
+        elif args.gnn_type=='gin':
+            gnn = gnn_model(args.num_layers, args.inp_dim, args.emb_dim, drop_ratio=args.dropout)
+            model = GDLinkPredictor(args.emb_dim, gnn, [args.gd_type, 'dist'])
         model = model.to(args.device)
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
 
-        train_learner = LinkPredictionLearner('train', train, model, loss, optimizer, args.batch_size)
-        val_learner = PrecomputeNELPLearner('val', val, model, None, None, args.eval_batch_size)
-        test_learner = PrecomputeNELPLearner('test', test, model, None, None, args.eval_batch_size)
+        train_learner = LinkPredictionLearner('train', train, model, args.batch_size)
+        val_learner = HGPrecomputeNELPLearner('val', val, model, args.eval_batch_size)
+        test_learner = HGPrecomputeNELPLearner('test', test, model, args.eval_batch_size)
 
-        trainer = Trainer(evlter, prepare_eval_data, args.num_workers, train_sample_size=train_sample_size)
+        trainer = Trainer(evlter, loss, args.num_workers, train_sample_size=train_sample_size)
 
         manager = Manager(args.model_name)
 
@@ -181,11 +186,11 @@ if __name__ == '__main__':
     parser.add_argument("--mol_emb_dim", type=int, default=32)
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--JK", type=str, default='last')
-    parser.add_argument("--hidden_dim", type=int, default=32)
+    parser.add_argument("--hidden_dim", type=int, default=256)
 
     parser.add_argument("--dropout",type=float,default=0)
 
-    parser.add_argument("--lr",type=float,default=0.0001)
+    parser.add_argument("--lr",type=float,default=0.01)
     parser.add_argument("--l2",type=float,default=0)
     parser.add_argument("--batch_size",type=int, default=4096)
     parser.add_argument("--eval_batch_size", type=int, default=512)
@@ -195,7 +200,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--num_epochs", type=int, default=5)
 
-    parser.add_argument("--reach_dist", type=int, default=3)
+    parser.add_argument("--reach_dist", type=int, default=2)
 
     parser.add_argument("--gpuid", type=int, default=0)
     parser.add_argument("--fold", type=int, default=10)
@@ -204,6 +209,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--gdgnn', type=bool, default=False)
     parser.add_argument('--gd_deg', type=bool, default=False)
+    parser.add_argument('--gnn_type', type=str, default='gcn')
 
     parser.add_argument("--psearch", type=bool, default=False)
 

@@ -69,9 +69,6 @@ def main(params):
         eval_metric = 'apr'
     else:
         eval_metric = 'auc'
-
-    def prepare_eval_data(res, data):
-        return [res, data.labels]
     
     loss = BinaryLoss()
 
@@ -99,11 +96,11 @@ def main(params):
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
 
-        train_learner = GraphPredictionLearner('train', train, model, loss, optimizer, args.batch_size)
-        val_learner = GraphPredictionLearner('val', val, model, None, None, args.eval_batch_size)
-        test_learner = GraphPredictionLearner('test', test, model, None, None, args.eval_batch_size)
+        train_learner = GraphPredictionLearner('train', train, model, args.batch_size)
+        val_learner = GraphPredictionLearner('val', val, model, args.eval_batch_size)
+        test_learner = GraphPredictionLearner('test', test, model, args.eval_batch_size)
 
-        trainer = Trainer(evlter, prepare_eval_data, args.num_workers)
+        trainer = Trainer(evlter, loss, args.num_workers)
 
         manager = Manager(args.model_name)
 

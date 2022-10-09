@@ -17,7 +17,7 @@ from gnnfree.nn.models.task_predictor import LinkPredictor
 from gnnfree.nn.models.GNN import RGCN
 
 from torch.optim import Adam
-from learners import LinkFixedSizeRankingLearner, LinkPredictionLearner, PrecomputeNELPLearner
+from learners import KGPrecomputeNELPLearner, LinkFixedSizeRankingLearner, LinkPredictionLearner, PrecomputeNELPLearner
 from models.link_predictor import GDLinkPredictor, RelLinkPredictor
 
 def main(params):
@@ -70,9 +70,6 @@ def main(params):
 
     evlter = VarSizeRankingEvaluator('varsizeeval', params.num_workers)
     eval_metric = 'mrr'
-
-    def prepare_eval_data(res, data):
-        return [res, data.bsize]
     
     # loss = NegLogLoss(params.neg_sample)
     loss = FirstPosNegLoss(params.neg_sample)
@@ -102,11 +99,11 @@ def main(params):
 
         optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.l2)
 
-        train_learner = LinkFixedSizeRankingLearner('train', train, model, loss, optimizer, args.batch_size)
-        val_learners = [PrecomputeNELPLearner('head_val', fix_head_val, model, None, None, args.eval_batch_size), PrecomputeNELPLearner('tail_val', fix_tail_val, model, None, None, args.eval_batch_size)]
-        test_learners = [PrecomputeNELPLearner('head_test', fix_head_test, model, None, None, args.eval_batch_size), PrecomputeNELPLearner('tail_val', fix_tail_test, model, None, None, args.eval_batch_size)]
+        train_learner = LinkFixedSizeRankingLearner('train', train, model, args.batch_size)
+        val_learners = [KGPrecomputeNELPLearner('head_val', fix_head_val, model, args.eval_batch_size), KGPrecomputeNELPLearner('tail_val', fix_tail_val, model, args.eval_batch_size)]
+        test_learners = [KGPrecomputeNELPLearner('head_test', fix_head_test, model, args.eval_batch_size), KGPrecomputeNELPLearner('tail_val', fix_tail_test, model, args.eval_batch_size)]
 
-        trainer = FilteredTrainer(evlter, prepare_eval_data, args.num_workers, train_sample_size=100)
+        trainer = FilteredTrainer(evlter, loss, args.num_workers)
 
         manager = Manager(args.model_name)
 

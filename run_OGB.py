@@ -8,7 +8,7 @@ from datasets import HGHorGDDataset, HGHorGDInterDataset, HGHorSampleGDDataset, 
 from gnnfree.managers.manager import Manager
 from gnnfree.managers.learner import *
 from gnnfree.managers.trainer import *
-from gnnfree.utils.evaluators import BinaryAccEvaluator, BinaryHNEvaluator, Evaluator, HNEvaluator
+from gnnfree.utils.evaluators import BinaryAccEvaluator, BinaryHNEvaluator, Evaluator, HNEvaluator, MaxEvaluator
 from gnnfree.utils.graph import construct_graph_from_edges
 from gnnfree.utils.io import save_load_torch_data
 from gnnfree.utils.utils import *
@@ -169,7 +169,7 @@ def main(params):
 
         return val_res, test_res
 
-    hparams={'num_layers':[2,3,4,5]} if params.psearch else {'num_layers':[params.num_layers]}
+    hparams={'num_layers':[2,3,4]} if params.psearch else {'num_layers':[params.num_layers]}
 
     best_res = hyperparameter_grid_search(hparams, [train, test, val], run_exp, params, eval_metric, evlter)
     
@@ -184,7 +184,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--emb_dim", type=int, default=32)
     parser.add_argument("--mol_emb_dim", type=int, default=32)
-    parser.add_argument("--num_layers", type=int, default=3)
+    parser.add_argument("--num_layers", type=int, default=2)
     parser.add_argument("--JK", type=str, default='last')
     parser.add_argument("--hidden_dim", type=int, default=256)
 
@@ -205,11 +205,11 @@ if __name__ == '__main__':
     parser.add_argument("--gpuid", type=int, default=0)
     parser.add_argument("--fold", type=int, default=10)
 
-    parser.add_argument("--gd_type", type=str, default='HorGD')
+    parser.add_argument("--gd_type", type=str, default='VerGD')
 
     parser.add_argument('--gdgnn', type=bool, default=False)
     parser.add_argument('--gd_deg', type=bool, default=False)
-    parser.add_argument('--gnn_type', type=str, default='gcn')
+    parser.add_argument('--gnn_type', type=str, default='gin')
 
     parser.add_argument("--psearch", type=bool, default=False)
 

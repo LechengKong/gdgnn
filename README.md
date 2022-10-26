@@ -2,9 +2,9 @@
 
 This is the official codebase of the paper
 
-Geodesic Graph Neural Network for Efficient Graph Representation Learning
+[Geodesic Graph Neural Network for Efficient Graph Representation Learning](https://arxiv.org/abs/2210.02636)
 
-Lecheng Kong, Muhan Zhang, Yixin Chen
+Lecheng Kong, Yixin Chen, Muhan Zhang
 
 The package is developed based on the GNN toolbox gnnfree.
 
@@ -15,8 +15,7 @@ We recommend installation from Conda:
 ```bash
 git clone https://github.com/woodcutter1998/gdgnn.git
 cd gdgnn
-git clone https://github.com/woodcutter1998/gnnfree.git
-conda env create -f gdgnn_environment.yml
+sh setup.sh
 ```
 
 ## Usage

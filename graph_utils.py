@@ -146,7 +146,7 @@ def get_vert_gd(graph, source_dist, node, dist):
     return gd, gd_len
 
 def get_gd_deg(adj, gd):
-    t = SmartTimer(True)
+    t = SmartTimer(False)
     t.record()
     grid = np.meshgrid(gd,gd)
     t.cal_and_update('grid')

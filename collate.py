@@ -6,16 +6,17 @@ import torch
 import random
 import time
 
+
 class HGLinkHorBatch:
     def __init__(self, samples):
         d = zip(*samples)
         self.ls = []
         for d1 in d:
             p = np.concatenate(d1)
-            p = torch.tensor(p,dtype=torch.long)
+            p = torch.tensor(p, dtype=torch.long)
             self.ls.append(p)
         # print(self.ls)
-        
+
     def pin_memory(self):
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].pin_memory()
@@ -34,7 +35,9 @@ class HGLinkHorBatch:
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].to(device)
         self.device = device
+        self.to_name()
         return self
+
 
 class HGLinkVerBatch:
     def __init__(self, samples):
@@ -42,10 +45,10 @@ class HGLinkVerBatch:
         self.ls = []
         for d1 in d:
             p = np.concatenate(d1)
-            p = torch.tensor(p,dtype=torch.long)
+            p = torch.tensor(p, dtype=torch.long)
             self.ls.append(p)
         # print(self.ls)
-        
+
     def pin_memory(self):
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].pin_memory()
@@ -68,7 +71,9 @@ class HGLinkVerBatch:
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].to(device)
         self.device = device
+        self.to_name()
         return self
+
 
 class KGLinkHorBatch:
     def __init__(self, samples):
@@ -76,7 +81,7 @@ class KGLinkHorBatch:
         self.ls = []
         for d1 in d:
             p = np.concatenate(d1)
-            p = torch.tensor(p,dtype=torch.long)
+            p = torch.tensor(p, dtype=torch.long)
             self.ls.append(p)
 
     def pin_memory(self):
@@ -98,7 +103,9 @@ class KGLinkHorBatch:
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].to(device)
         self.device = device
+        self.to_name()
         return self
+
 
 class KGLinkVerBatch:
     def __init__(self, samples):
@@ -106,7 +113,7 @@ class KGLinkVerBatch:
         self.ls = []
         for i, d1 in enumerate(d):
             p = np.concatenate(d1)
-            p = torch.tensor(p,dtype=torch.long)
+            p = torch.tensor(p, dtype=torch.long)
             self.ls.append(p)
 
     def pin_memory(self):
@@ -130,8 +137,8 @@ class KGLinkVerBatch:
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].to(device)
         self.device = device
+        self.to_name()
         return self
-
 
 
 class HGGraphBatch:
@@ -145,7 +152,16 @@ class HGGraphBatch:
         gd_deg_list = []
         labels_list = []
         offset = 0
-        for graph, neighbors_ind, neighbors_count, neighbors_dist, gd, gd_count, gd_deg, labels in samples:
+        for (
+            graph,
+            neighbors_ind,
+            neighbors_count,
+            neighbors_dist,
+            gd,
+            gd_count,
+            gd_deg,
+            labels,
+        ) in samples:
             num_nodes = graph.num_nodes()
             graph_list.append(graph)
             neighbors_ind += offset
@@ -162,10 +178,17 @@ class HGGraphBatch:
         self.ls = []
         batched_graph = dgl.batch(graph_list)
         self.ls.append(batched_graph)
-        d = [neighbors_list, neighbors_count_list, dist_list, gd_list, gd_count_list, gd_deg_list]
+        d = [
+            neighbors_list,
+            neighbors_count_list,
+            dist_list,
+            gd_list,
+            gd_count_list,
+            gd_deg_list,
+        ]
         for i, d1 in enumerate(d):
             p = np.concatenate(d1)
-            p = torch.tensor(p,dtype=torch.long)
+            p = torch.tensor(p, dtype=torch.long)
             self.ls.append(p)
         labels_list = np.concatenate(labels_list)
         self.ls.append(torch.tensor(labels_list, dtype=torch.float))
@@ -189,6 +212,7 @@ class HGGraphBatch:
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].to(device)
         self.device = device
+        self.to_name()
         return self
 
 
@@ -198,7 +222,7 @@ class HGNodeBatch:
         self.ls = []
         for d1 in d:
             p = np.concatenate(d1)
-            p = torch.tensor(p,dtype=torch.long)
+            p = torch.tensor(p, dtype=torch.long)
             self.ls.append(p)
 
     def pin_memory(self):
@@ -220,7 +244,9 @@ class HGNodeBatch:
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].to(device)
         self.device = device
+        self.to_name()
         return self
+
 
 class GraphLabelBatch:
     def __init__(self, samples):
@@ -233,7 +259,7 @@ class GraphLabelBatch:
         for i in range(1, len(self.ls)):
             self.ls[i] = self.ls[i].pin_memory()
         return self
-    
+
     def to(self, device):
         for i in range(len(self.ls)):
             self.ls[i] = self.ls[i].to(device)
@@ -244,23 +270,30 @@ class GraphLabelBatch:
         self.g = self.ls[0]
         self.labels = self.ls[1]
 
+
 def collate_hor_link(samples):
     return HGLinkHorBatch(samples)
+
 
 def collate_ver_link(samples):
     return HGLinkVerBatch(samples)
 
+
 def collate_hor_link_kg(samples):
     return KGLinkHorBatch(samples)
+
 
 def collate_ver_link_kg(samples):
     return KGLinkVerBatch(samples)
 
+
 def collate_graph_hg(samples):
     return HGGraphBatch(samples)
 
+
 def collate_tuple_g(samples):
     return GraphLabelBatch(samples)
+
 
 def collate_node_hg(samples):
     return HGNodeBatch(samples)

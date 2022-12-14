@@ -140,3 +140,5 @@ engr_job
 molecules.zip
 test_bed.py
 train_out.*
+
+.vscode/

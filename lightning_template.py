@@ -5,8 +5,13 @@ from torch.utils.data import DataLoader, RandomSampler
 from pytorch_lightning import LightningModule
 from gnnfree.nn.models.basic_models import MLPLayers, Predictor
 
+"""Pytorch lightning pipeline for node, link, graph level tasks.
+"""
+
 
 class BaseTemplate(LightningModule):
+    """Basic template, controls dataloading"""
+
     def __init__(self, save_dir, datasets, params):
 
         super().__init__()
@@ -69,6 +74,11 @@ class BaseTemplate(LightningModule):
 
 
 class PredictorTemplate(BaseTemplate, metaclass=ABCMeta):
+    """Template with a GNN encoder, a task_predictor that extract information
+    from the embedding from GNN encoder. Then apply a mlp onto the extracted
+    information.
+    """
+
     def __init__(
         self,
         save_dir,
@@ -135,10 +145,12 @@ class LinkPredTemplate(PredictorTemplate):
         return x
 
     def on_train_epoch_start(self):
+        # a new grpah with masked edge for every batch during training
         self.task_predictor.embedding_only_mode(False)
 
     def training_step(self, batch, batch_idx):
         g = self.datasets["train"].graph.to(batch.device)
+        # graph edges masking
         edge_mask = batch.edge_mask
         edge_bool = torch.ones(
             g.num_edges(), dtype=torch.bool, device=batch.device
@@ -146,11 +158,13 @@ class LinkPredTemplate(PredictorTemplate):
         edge_bool[edge_mask] = 0
         subg = dgl.edge_subgraph(g, edge_bool, relabel_nodes=False)
         batch.g = subg
+
         score = self(batch.g, batch.head, batch.tail, batch)
         loss = self.compute_loss(score, batch)
         return loss
 
     def on_validation_epoch_start(self):
+        # save a encoded graph with node representation for fast inference
         self.saved_g = self.datasets["train"].graph.to(self.device)
         self.saved_g.ndata["repr"] = self.gnn(self.saved_g)
         self.task_predictor.embedding_only_mode(True)
@@ -160,7 +174,6 @@ class LinkPredTemplate(PredictorTemplate):
         loss = self.compute_loss(score, batch)
         self.eval_step(score, batch)
 
-        # Calling self.log will surface up scalars for you in TensorBoard
         self.log(
             "val_loss",
             loss,
@@ -343,7 +356,6 @@ class NodePredTemplate(PredictorTemplate):
         loss = self.compute_loss(score, batch)
         self.eval_step(score, batch)
 
-        # Calling self.log will surface up scalars for you in TensorBoard
         self.log(
             "val_loss",
             loss,
@@ -364,8 +376,6 @@ class NodePredTemplate(PredictorTemplate):
         score = self(self.saved_g, batch.node, batch)
         loss = self.compute_loss(score, batch)
         self.eval_step(score, batch)
-
-        # Calling self.log will surface up scalars for you in TensorBoard
         self.log(
             "val_loss",
             loss,

@@ -36,6 +36,8 @@ class Transform(Extractor):
 
 
 class GDTransform(Transform):
+    """compute node-level GD representation.
+    """
     def __init__(self, emb_dim, gd_deg=True) -> None:
         super().__init__(emb_dim)
         self.gd_deg = gd_deg
@@ -63,7 +65,24 @@ class GDTransform(Transform):
         gd_count,
         gd_deg,
     ):
+        """
 
+        Arguments:
+            repr {torch.tensor} -- N*d tensor of node representations
+            nodes {torch.tensor} -- 1-d nodes of interests
+            neighbors {torch.tensor} -- neighbors indices of nodes
+            neighbor_count {torch.tensor} -- nodes[i]'s neighbor=
+            neighbors[cumsum(neighbor_count[:i]):cumsum(neighbor_count[:i+1])]
+            dist {torch.tensor} -- dist[i]=distance between neighbors[i] and
+            its corresponding source in nodes.
+            gd {torch.tensor} -- Vertical Geodesics indices of neighbors
+            gd_count {torch.tensor} -- neighbors[i]'s vertical geodesics=
+                    gd[cumsum(gd_count[i]):cumsum(gd_count[i+1])]
+            gd_deg {torch.tensor} -- same shape as gd, vertical gd degrees.
+
+        Returns:
+            Vertical geodesics of each node in nodes.
+        """
         neighbors_repr = repr[neighbors]
         gd_repr = repr[gd]
         if self.gd_deg:
@@ -128,6 +147,8 @@ class ScatterReprTransform(Transform):
 
 
 class VerGDTransform(Transform):
+    """Vertical GD representation for links
+    """
     def __init__(self, emb_dim, gd_deg=False) -> None:
         super().__init__(emb_dim)
         self.gd_deg = gd_deg
@@ -140,6 +161,14 @@ class VerGDTransform(Transform):
         )
 
     def get_ver_gd_one_side(self, repr, gd, gd_len, gd_deg):
+        """Get vertical geodesics of one side.
+
+        Arguments:
+            repr {torch.tensor} -- graph node representations
+            gd {torch.tensor} -- vertical geodesics
+            gd_len {torch.tensor} -- count of each vertical geodesics
+            gd_deg {torch.tensor} -- degrees of each vertical gd node
+        """
         gd_repr = repr[gd]
         if gd_deg:
             gd_repr = self.mlp_combine_gd_deg(

@@ -3,6 +3,7 @@ import torch
 import argparse
 import os.path as osp
 import numpy as np
+import json
 from datetime import datetime
 from datasets import (
     HGHorGDInterDataset,
@@ -18,7 +19,12 @@ from pytorch_lightning.loggers import CSVLogger
 from gnnfree.utils.evaluators import HNEvaluator
 from gnnfree.utils.graph import construct_graph_from_edges
 from gnnfree.utils.io import save_load_torch_data
-from gnnfree.utils.utils import save_params, set_random_seed
+from gnnfree.utils.utils import (
+    save_params,
+    set_random_seed,
+    hyperparameter_grid_search,
+    write_res_to_file,
+)
 
 from gnnfree.nn.models.GNN import HomogeneousGNN
 from gnnfree.nn.loss import BinaryLoss
@@ -29,8 +35,6 @@ from models.link_predictor import GDLinkPredictor
 
 from scipy.sparse import coo_matrix
 from ogb.linkproppred import DglLinkPropPredDataset
-
-from dgl.nn.pytorch import GraphConv
 
 
 def main(params):
@@ -171,108 +175,167 @@ def main(params):
     params.val_size = len(val)
 
     print(
-        f"Training graph has {params.train_edges} edges, validataion set has {params.val_size} query edges, test set has {params.test_size} query edges"
+        f"Training graph has {params.train_edges} edges, validataion set has"
+        f"{params.val_size} query edges, test set has {params.test_size} query"
+        f"edges"
     )
 
     # ------------------ Data Prepare End ------------------ #
-
-    feature_list = ["head", "tail", "dist"]
-    if params.gd_type == "VerGD":
-        feature_list.append("HeadVerGD" + ("Deg" if params.gd_deg else ""))
-        feature_list.append("TailVerGD" + ("Deg" if params.gd_deg else ""))
-    elif params.gd_type == "HorGD":
-        feature_list.append("HorGD")
-    params.feature_list = feature_list
-
-    gnn = HomogeneousGNN(params.reach_dist, params.inp_dim, params.emb_dim)
-    link_predictor = GDLinkPredictor(params.emb_dim, gnn, params.feature_list)
-
     loss = BinaryLoss()
     evlter = HNEvaluator("hne", params.hn)
+    eval_metric = "h" + str(params.hn)
 
-    link_pred = HGLinkPred(
-        params.exp_dir,
-        {"train": train, "val": val, "test": test},
-        params,
-        gnn,
-        link_predictor,
-        loss,
-        evlter,
+    def run_exp(data, params):
+
+        feature_list = ["head", "tail", "dist"]
+        if params.gd_type == "VerGD":
+            feature_list.append("HeadVerGD" + ("Deg" if params.gd_deg else ""))
+            feature_list.append("TailVerGD" + ("Deg" if params.gd_deg else ""))
+        elif params.gd_type == "HorGD":
+            feature_list.append("HorGD")
+        params.feature_list = feature_list
+
+        gnn = HomogeneousGNN(params.reach_dist, params.inp_dim, params.emb_dim)
+        link_predictor = GDLinkPredictor(
+            params.emb_dim, gnn, params.feature_list
+        )
+
+        link_pred = HGLinkPred(
+            params.exp_dir,
+            {"train": train, "val": val, "test": test},
+            params,
+            gnn,
+            link_predictor,
+            loss,
+            evlter,
+        )
+
+        trainer = Trainer(
+            accelerator="auto",
+            devices=1 if torch.cuda.is_available() else None,
+            max_epochs=3,
+            callbacks=[
+                TQDMProgressBar(refresh_rate=20),
+                ModelCheckpoint(monitor=eval_metric, mode="max"),
+            ],
+            logger=CSVLogger(save_dir=params.exp_dir),
+        )
+        trainer.fit(link_pred)
+        valid_res = trainer.validate()[0]
+        test_res = trainer.test()[0]
+        return valid_res, test_res
+
+    hparams = (
+        {"num_layers": [2, 3, 4]}
+        if params.psearch
+        else {"num_layers": [params.num_layers]}
     )
 
-    trainer = Trainer(
-        accelerator="auto",
-        devices=1 if torch.cuda.is_available() else None,
-        max_epochs=3,
-        callbacks=[
-            TQDMProgressBar(refresh_rate=20),
-            ModelCheckpoint(monitor="h" + str(params.hn), mode="max"),
-        ],
-        logger=CSVLogger(save_dir=params.exp_dir),
+    best_res = hyperparameter_grid_search(
+        hparams, [train, test, val], run_exp, params, eval_metric, evlter
     )
-    trainer.fit(link_pred)
 
-    trainer.test()
-
-    # hparams = (
-    #     {"num_layers": [2, 3, 4]}
-    #     if params.psearch
-    #     else {"num_layers": [params.num_layers]}
-    # )
-
-    # best_res = hyperparameter_grid_search(
-    #     hparams, [train, test, val], run_exp, params, eval_metric, evlter
-    # )
-
-    # write_res_to_file(
-    #     osp.join(params.exp_dir, "result"),
-    #     params.train_data_set,
-    #     eval_metric,
-    #     best_res["test_mean"],
-    #     best_res["val_mean"],
-    #     best_res["test_std"],
-    #     best_res["val_std"],
-    #     best_res["params"],
-    #     json.dumps(best_res),
-    # )
+    write_res_to_file(
+        osp.join(params.exp_dir, "result"),
+        params.train_data_set,
+        eval_metric,
+        best_res["test_mean"],
+        best_res["val_mean"],
+        best_res["test_std"],
+        best_res["val_std"],
+        best_res["params"],
+        json.dumps(best_res),
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gnn")
 
     parser.add_argument("--data_path", type=str, default="./data")
-    parser.add_argument("--train_data_set", type=str, default="ogbl-collab")
+    parser.add_argument("--train_data_set", type=str, default="brazil_airport")
 
-    parser.add_argument("--emb_dim", type=int, default=32)
-    parser.add_argument("--mol_emb_dim", type=int, default=32)
-    parser.add_argument("--num_layers", type=int, default=2)
-    parser.add_argument("--JK", type=str, default="last")
-    parser.add_argument("--hidden_dim", type=int, default=256)
+    parser.add_argument(
+        "--emb_dim", type=int, default=32, help="overall embedding dimension"
+    )
+    parser.add_argument(
+        "--mol_emb_dim",
+        type=int,
+        default=32,
+        help="embedding dimension for atom/bond",
+    )
+    parser.add_argument(
+        "--num_layers", type=int, default=2, help="number of GNN layers"
+    )
+    parser.add_argument(
+        "--JK",
+        type=str,
+        default="last",
+        help="jumping knowledge, should be 'last' or 'sum'",
+    )
 
     parser.add_argument("--dropout", type=float, default=0)
 
-    parser.add_argument("--lr", type=float, default=0.01)
-    parser.add_argument("--l2", type=float, default=0)
-    parser.add_argument("--batch_size", type=int, default=4096)
-    parser.add_argument("--eval_batch_size", type=int, default=512)
+    parser.add_argument(
+        "--lr", type=float, default=0.0001, help="learning rate"
+    )
+    parser.add_argument(
+        "--l2", type=float, default=0, help="l2 regularization strength"
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=64, help="training batch size"
+    )
+    parser.add_argument(
+        "--eval_batch_size", type=int, default=64, help="evaluation batch size"
+    )
 
-    parser.add_argument("--num_workers", type=int, default=32)
-    parser.add_argument("--save_every", type=int, default=1)
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=20,
+        help="number of workers in dataloading",
+    )
 
-    parser.add_argument("--num_epochs", type=int, default=5)
+    parser.add_argument(
+        "--num_epochs",
+        type=int,
+        default=100,
+        help="number of epochs in one training routine",
+    )
 
-    parser.add_argument("--reach_dist", type=int, default=2)
+    parser.add_argument(
+        "--reach_dist",
+        type=int,
+        default=3,
+        help="max cutoff distance to find geodesics",
+    )
 
-    parser.add_argument("--gpuid", type=int, default=0)
-    parser.add_argument("--fold", type=int, default=10)
+    parser.add_argument(
+        "--fold",
+        type=int,
+        default=10,
+        help="number of fold for cross validation",
+    )
 
-    parser.add_argument("--gd_type", type=str, default="VerGD")
+    parser.add_argument(
+        "--gd_type",
+        type=str,
+        default="HorGD",
+        help="geodesic types, should be VerGD or HorGD",
+    )
 
-    parser.add_argument("--gdgnn", type=bool, default=False)
-    parser.add_argument("--gd_deg", type=bool, default=False)
-    parser.add_argument("--gnn_type", type=str, default="gin")
+    parser.add_argument(
+        "--gd_deg",
+        type=bool,
+        default=False,
+        help="whether to use geodesic degrees for VerGD",
+    )
 
-    parser.add_argument("--psearch", type=bool, default=False)
+    parser.add_argument(
+        "--psearch",
+        type=bool,
+        default=False,
+        help="perform hyperparameter search",
+    )
 
     params = parser.parse_args()
     set_random_seed(1)

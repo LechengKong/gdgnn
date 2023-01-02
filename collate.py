@@ -1,10 +1,9 @@
-import sys
 import torch
 import dgl
 import numpy as np
-import torch
-import random
-import time
+
+"""The repository of batch functions that combines each samples into batches
+"""
 
 
 class HGLinkHorBatch:
@@ -176,6 +175,7 @@ class HGGraphBatch:
             offset += num_nodes
             # print('didi')
         self.ls = []
+        # Graphs needs to be batched specifically
         batched_graph = dgl.batch(graph_list)
         self.ls.append(batched_graph)
         d = [

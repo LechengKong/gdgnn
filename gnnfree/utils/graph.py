@@ -50,6 +50,9 @@ def sample_fixed_hop_size_neighbor(adj_mat, root, hop, max_nodes_per_hope=500):
 
 
 def get_k_hop_neighbors(adj_mat, root, hop, block_node=None):
+    """Return k-hop neighbor dictionary of root.
+    hop2neighbor[i] = the nodes that are exactly i distance away from root.
+    """
     if block_node:
         visited = np.array([root, block_node])
     else:

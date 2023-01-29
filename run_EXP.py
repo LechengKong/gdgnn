@@ -91,6 +91,7 @@ def main(params):
     loss = MultiClassLoss()
 
     def run_exp(data, params):
+        params.reach_dist = params.num_layers
         gnn = HomogeneousGNN(params.reach_dist, params.inp_dim, params.emb_dim)
         graph_classifier = GDGraphClassifier(
             params.emb_dim, gnn, params.gd_deg
@@ -158,7 +159,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gnn")
 
     parser.add_argument("--data_path", type=str, default="./data")
-    parser.add_argument("--train_data_set", type=str, default="brazil_airport")
+    parser.add_argument("--train_data_set", type=str, default="exp")
 
     parser.add_argument(
         "--emb_dim", type=int, default=32, help="overall embedding dimension"
@@ -170,7 +171,7 @@ if __name__ == "__main__":
         help="embedding dimension for atom/bond",
     )
     parser.add_argument(
-        "--num_layers", type=int, default=2, help="number of GNN layers"
+        "--num_layers", type=int, default=4, help="number of GNN layers"
     )
     parser.add_argument(
         "--JK",

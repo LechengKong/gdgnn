@@ -219,7 +219,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_epochs",
         type=int,
-        default=100,
+        default=200,
         help="number of epochs in one training routine",
     )
 

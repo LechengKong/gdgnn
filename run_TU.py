@@ -90,6 +90,7 @@ def main(params):
     loss = MultiClassLoss()
 
     def run_exp(data, params):
+        params.reach_dist = params.num_layers
         gnn = HomogeneousGNN(params.reach_dist, params.inp_dim, params.emb_dim)
         graph_classifier = GDGraphClassifier(
             params.emb_dim, gnn, params.gd_deg
@@ -113,7 +114,7 @@ def main(params):
         trainer = Trainer(
             accelerator="auto",
             devices=1 if torch.cuda.is_available() else None,
-            max_epochs=3,
+            max_epochs=params.num_epochs,
             callbacks=[
                 TQDMProgressBar(refresh_rate=20),
                 ModelCheckpoint(monitor=eval_metric, mode="max"),
@@ -121,8 +122,9 @@ def main(params):
             logger=CSVLogger(save_dir=params.exp_dir),
         )
         trainer.fit(graph_pred)
-
-        trainer.test()
+        valid_res = trainer.validate()[0]
+        test_res = trainer.test()[0]
+        return valid_res, test_res
 
     hparams = (
         {"num_layers": [2, 3, 4, 5]}
@@ -157,7 +159,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gnn")
 
     parser.add_argument("--data_path", type=str, default="./data")
-    parser.add_argument("--train_data_set", type=str, default="brazil_airport")
+    parser.add_argument("--train_data_set", type=str, default="DD")
 
     parser.add_argument(
         "--emb_dim", type=int, default=32, help="overall embedding dimension"
@@ -169,7 +171,7 @@ if __name__ == "__main__":
         help="embedding dimension for atom/bond",
     )
     parser.add_argument(
-        "--num_layers", type=int, default=2, help="number of GNN layers"
+        "--num_layers", type=int, default=5, help="number of GNN layers"
     )
     parser.add_argument(
         "--JK",
@@ -181,16 +183,16 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0)
 
     parser.add_argument(
-        "--lr", type=float, default=0.0001, help="learning rate"
+        "--lr", type=float, default=0.001, help="learning rate"
     )
     parser.add_argument(
         "--l2", type=float, default=0, help="l2 regularization strength"
     )
     parser.add_argument(
-        "--batch_size", type=int, default=64, help="training batch size"
+        "--batch_size", type=int, default=32, help="training batch size"
     )
     parser.add_argument(
-        "--eval_batch_size", type=int, default=64, help="evaluation batch size"
+        "--eval_batch_size", type=int, default=32, help="evaluation batch size"
     )
 
     parser.add_argument(
@@ -231,7 +233,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gd_deg",
         type=bool,
-        default=False,
+        default=True,
         help="whether to use geodesic degrees for VerGD",
     )
 

@@ -106,7 +106,10 @@ def main(params):
     loss = MultiClassLoss()
 
     def run_exp(data, params):
-        gnn = HomogeneousGNN(params.reach_dist, params.inp_dim, params.emb_dim)
+        params.reach_dist = params.num_layers
+        gnn = HomogeneousGNN(
+            params.reach_dist, params.inp_dim, params.emb_dim, batch_norm=False
+        )
         graph_classifier = GDGraphClassifier(
             params.emb_dim, gnn, params.gd_deg
         )
@@ -174,7 +177,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gnn")
 
     parser.add_argument("--data_path", type=str, default="./data")
-    parser.add_argument("--train_data_set", type=str, default="brazil_airport")
+    parser.add_argument("--train_data_set", type=str, default="csl")
 
     parser.add_argument(
         "--emb_dim", type=int, default=32, help="overall embedding dimension"
@@ -186,7 +189,7 @@ if __name__ == "__main__":
         help="embedding dimension for atom/bond",
     )
     parser.add_argument(
-        "--num_layers", type=int, default=2, help="number of GNN layers"
+        "--num_layers", type=int, default=4, help="number of GNN layers"
     )
     parser.add_argument(
         "--JK",
@@ -198,16 +201,16 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0)
 
     parser.add_argument(
-        "--lr", type=float, default=0.0001, help="learning rate"
+        "--lr", type=float, default=0.001, help="learning rate"
     )
     parser.add_argument(
         "--l2", type=float, default=0, help="l2 regularization strength"
     )
     parser.add_argument(
-        "--batch_size", type=int, default=64, help="training batch size"
+        "--batch_size", type=int, default=16, help="training batch size"
     )
     parser.add_argument(
-        "--eval_batch_size", type=int, default=64, help="evaluation batch size"
+        "--eval_batch_size", type=int, default=16, help="evaluation batch size"
     )
 
     parser.add_argument(

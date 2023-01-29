@@ -26,11 +26,13 @@ class BaseTemplate(LightningModule):
         if not hasattr(self.params, "train_sample_size"):
             self.params.train_sample_size = None
 
-    def creata_dataloader(self, data, size, drop_last=True, shuffle=True):
+    def creata_dataloader(
+        self, data, size, batch_size, drop_last=True, shuffle=True
+    ):
         if size is None:
             return DataLoader(
                 data,
-                batch_size=self.params.batch_size,
+                batch_size=batch_size,
                 num_workers=self.params.num_workers,
                 collate_fn=data.get_collate_fn(),
                 shuffle=shuffle,
@@ -40,7 +42,7 @@ class BaseTemplate(LightningModule):
         else:
             return DataLoader(
                 data,
-                batch_size=self.params.batch_size,
+                batch_size=batch_size,
                 num_workers=self.params.num_workers,
                 collate_fn=data.get_collate_fn(),
                 sampler=RandomSampler(
@@ -53,13 +55,16 @@ class BaseTemplate(LightningModule):
 
     def train_dataloader(self):
         return self.creata_dataloader(
-            self.datasets["train"], self.params.train_sample_size
+            self.datasets["train"],
+            self.params.train_sample_size,
+            self.params.batch_size,
         )
 
     def val_dataloader(self):
         return self.creata_dataloader(
             self.datasets["val"],
             self.params.eval_sample_size,
+            self.params.eval_batch_size,
             drop_last=False,
             shuffle=False,
         )
@@ -68,6 +73,7 @@ class BaseTemplate(LightningModule):
         return self.creata_dataloader(
             self.datasets["test"],
             self.params.eval_sample_size,
+            self.params.eval_batch_size,
             drop_last=False,
             shuffle=False,
         )
@@ -89,6 +95,7 @@ class PredictorTemplate(BaseTemplate, metaclass=ABCMeta):
         loss,
         evlter,
         out_dim=1,
+        b_norm=True,
     ):
 
         super().__init__(save_dir, datasets, params)
@@ -99,7 +106,9 @@ class PredictorTemplate(BaseTemplate, metaclass=ABCMeta):
         self.task_predictor = task_predictor
 
         self.mlp = MLPLayers(
-            3, [self.task_predictor.get_out_dim(), 512, 512, out_dim]
+            3,
+            [self.task_predictor.get_out_dim(), 512, 512, out_dim],
+            batch_norm=b_norm,
         )
 
         self.model = Predictor(self.task_predictor, self.mlp)
@@ -120,7 +129,17 @@ class PredictorTemplate(BaseTemplate, metaclass=ABCMeta):
             lr=self.params.lr,
             weight_decay=self.params.l2,
         )
-        return optimizer
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer, factor=0.5
+                ),
+                "monitor": "loss",
+                "frequency": 1,
+                "interval": "epoch",
+            },
+        }
 
     @abstractmethod
     def compute_loss(self, output, batch):
@@ -161,6 +180,11 @@ class LinkPredTemplate(PredictorTemplate):
 
         score = self(batch.g, batch.head, batch.tail, batch)
         loss = self.compute_loss(score, batch)
+        self.log(
+            "loss",
+            loss,
+            batch_size=self.params.batch_size,
+        )
         return loss
 
     def on_validation_epoch_start(self):
@@ -282,6 +306,11 @@ class GraphPredTemplate(PredictorTemplate):
     def training_step(self, batch, batch_idx):
         score = self(batch.g, batch)
         loss = self.compute_loss(score, batch)
+        self.log(
+            "loss",
+            loss,
+            batch_size=self.params.batch_size,
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -344,6 +373,11 @@ class NodePredTemplate(PredictorTemplate):
         batch.g = g
         score = self(batch.g, batch.node, batch)
         loss = self.compute_loss(score, batch)
+        self.log(
+            "loss",
+            loss,
+            batch_size=self.params.batch_size,
+        )
         return loss
 
     def on_validation_epoch_start(self):

@@ -158,6 +158,7 @@ def main(params):
     loss = FirstPosNegLoss(params.neg_sample)
 
     def run_exp(data, params):
+        params.reach_dist = params.num_layers
         feature_list = ["head", "tail", "dist", "Rel"]
         if params.gd_type == "VerGD":
             feature_list.append("HeadVerGD" + ("Deg" if params.gd_deg else ""))

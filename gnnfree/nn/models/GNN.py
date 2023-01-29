@@ -190,7 +190,9 @@ class HomogeneousGNN(MultiLayerMessagePassing):
         self.build_layers()
 
     def build_one_layer(self, inp_dim, out_dim):
-        return self.layer_t(inp_dim, out_dim)
+        return self.layer_t(
+            inp_dim, out_dim, batch_norm=self.batch_norm is not None
+        )
 
     def build_message_from_graph(self, g):
         return {"g": g, "h": g.ndata["feat"]}

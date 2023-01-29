@@ -36,9 +36,9 @@ class Transform(Extractor):
 
 
 class GDTransform(Transform):
-    """compute node-level GD representation.
-    """
-    def __init__(self, emb_dim, gd_deg=True) -> None:
+    """compute node-level GD representation."""
+
+    def __init__(self, emb_dim, gd_deg=True, batch_norm=True) -> None:
         super().__init__(emb_dim)
         self.gd_deg = gd_deg
         if gd_deg:
@@ -48,10 +48,14 @@ class GDTransform(Transform):
                 batch_norm=False,
             )
         self.mlp_combine_nei_gd = MLPLayers(
-            2, h_units=[2 * emb_dim + 1, 4 * emb_dim, emb_dim]
+            2,
+            h_units=[2 * emb_dim + 1, 4 * emb_dim, emb_dim],
+            batch_norm=batch_norm,
         )
         self.mlp_combine_node_nei = MLPLayers(
-            2, h_units=[2 * emb_dim, 4 * emb_dim, emb_dim]
+            2,
+            h_units=[2 * emb_dim, 4 * emb_dim, emb_dim],
+            batch_norm=batch_norm,
         )
 
     def forward(
@@ -147,8 +151,8 @@ class ScatterReprTransform(Transform):
 
 
 class VerGDTransform(Transform):
-    """Vertical GD representation for links
-    """
+    """Vertical GD representation for links"""
+
     def __init__(self, emb_dim, gd_deg=False) -> None:
         super().__init__(emb_dim)
         self.gd_deg = gd_deg

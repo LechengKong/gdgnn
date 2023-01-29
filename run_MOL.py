@@ -96,6 +96,7 @@ def main(params):
     loss = BinaryLoss()
 
     def run_exp(data, params):
+        params.reach_dist = params.num_layers
         gnn = gnn_model(
             params.reach_dist,
             params.inp_dim,

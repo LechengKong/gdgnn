@@ -186,7 +186,7 @@ def main(params):
     eval_metric = "h" + str(params.hn)
 
     def run_exp(data, params):
-
+        params.reach_dist = params.num_layers
         feature_list = ["head", "tail", "dist"]
         if params.gd_type == "VerGD":
             feature_list.append("HeadVerGD" + ("Deg" if params.gd_deg else ""))
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gnn")
 
     parser.add_argument("--data_path", type=str, default="./data")
-    parser.add_argument("--train_data_set", type=str, default="brazil_airport")
+    parser.add_argument("--train_data_set", type=str, default="ogbl-collab")
 
     parser.add_argument(
         "--emb_dim", type=int, default=32, help="overall embedding dimension"
@@ -276,22 +276,25 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0)
 
     parser.add_argument(
-        "--lr", type=float, default=0.0001, help="learning rate"
+        "--lr", type=float, default=0.001, help="learning rate"
     )
     parser.add_argument(
         "--l2", type=float, default=0, help="l2 regularization strength"
     )
     parser.add_argument(
-        "--batch_size", type=int, default=64, help="training batch size"
+        "--batch_size", type=int, default=4096, help="training batch size"
     )
     parser.add_argument(
-        "--eval_batch_size", type=int, default=64, help="evaluation batch size"
+        "--eval_batch_size",
+        type=int,
+        default=512,
+        help="evaluation batch size",
     )
 
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=20,
+        default=32,
         help="number of workers in dataloading",
     )
 
